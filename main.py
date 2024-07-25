@@ -1,5 +1,6 @@
 from carnivore import *
-
+sin_table = [math.sin(math.radians(i)) for i in range(360)]
+cos_table = [math.cos(math.radians(i)) for i in range(360)]
 class Herbivore:
     def __init__(self, x, y, _type_, traits, generation):
         self.x = x
@@ -153,16 +154,29 @@ class Herbivore:
             self.target = None
 
         dists = [math.dist((self.x, self.y), (carnivore.x, carnivore.y)) for carnivore in carnivores]
-        if min(dists) < 200:
-            if carnivores[dists.index(min(dists))].target_creature != None:
-                if carnivores[dists.index(min(dists))].target_creature.__hash__() == self.__hash__():
-                    self.move_angle = -(angle_between(((self.x, self.y), (carnivores[dists.index(min(dists))].x, carnivores[dists.index(min(dists))].y))))
+        
+        if min(dists) <= 200:
+            
+            best_average_dist = 0
+            for i in range(180):
+                check_point = [self.x + self.speed*cos_table[i]*60, self.y + self.speed*sin_table[i]*60]
+                avg_dist = 0
+                num_enemies = 0
+                for carnivore in carnivores:
+                    if math.dist((self.x, self.y), (carnivore.x, carnivore.y)) <= 200:
+                        avg_dist += math.dist(check_point, (carnivore.x, carnivore.y))
+                        num_enemies += 1
 
+                avg_dist /= num_enemies
+                if avg_dist > best_average_dist:
+                    best_average_dist = avg_dist
+                    self.move_angle = i
+            
         self.vel = [self.speed*math.cos(math.radians(self.move_angle)), self.speed*math.sin(math.radians(self.move_angle))]
 
         self.x += self.vel[0]
         self.y += self.vel[1]
-
+        
         if self.x <= -1300 or self.y <= -1300:
             self.move_angle -= 180
 
@@ -197,14 +211,14 @@ while True:
     plant_manager.update()
 
     if pygame.key.get_pressed()[pygame.K_RIGHT]:
-        cam_offset[0] -= 4
+        cam_offset[0] -= 8
     if pygame.key.get_pressed()[pygame.K_LEFT]:
-        cam_offset[0] += 4
+        cam_offset[0] += 8
 
     if pygame.key.get_pressed()[pygame.K_UP]:
-        cam_offset[1] += 4
+        cam_offset[1] += 8
     if pygame.key.get_pressed()[pygame.K_DOWN]:
-        cam_offset[1] -= 4
+        cam_offset[1] -= 8
 
     """if time.time() - overall_time >= 15:
         print("a")
@@ -241,8 +255,8 @@ while True:
     pygame.draw.rect(win, [125, 125, 125], pygame.Rect(0, 0, 450, 225))
     pop_text = font.render("Population: " + str(len(creatures)), False, [0, 0, 0], [125, 125, 125])
 
-    avg_speed = sum([(creature.traits[-1]) for creature in creatures])/len(creatures)
-    speed_text = font.render("Speed: " + str(round(avg_speed, 3)), False, [0, 0, 0], [125, 125, 125])
+    avg_speed = sum([(creature.traits[-1]) for creature in carnivores])/len(carnivores)
+    speed_text = font.render("Carn Speed: " + str(round(avg_speed, 3)), False, [0, 0, 0], [125, 125, 125])
     
     avg_size = sum([(creature.traits[1]) for creature in creatures])/len(creatures)
     size_text = font.render("Radius: " + str(round(avg_size, 3)), False, [0, 0, 0], [125, 125, 125])
@@ -261,10 +275,10 @@ while True:
     win.blit(gen_text, (10, 170))
     win.blit(d_text, (10, 210))
 
-    n_packs = 0
+    """n_packs = 0
     for carnivore in carnivores:
         if carnivore.pack_leader == None:
             n_packs += 1
-    print(n_packs, ", ", len(carnivores))
+    print(n_packs, ", ", len(carnivores))"""
     
     pygame.display.update()
