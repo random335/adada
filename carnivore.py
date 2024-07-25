@@ -72,7 +72,11 @@ class Carnivore:
         self.pack = []
 
         self.to_rest = False
+        self.difference = 0
 
+        self.rest_duration = 3.5
+        self.breed_interval = 6.5
+        
     def new(self):
         global carnivores
         if self.target == None:
@@ -153,7 +157,7 @@ class Carnivore:
                         self.pack.append(child.__hash__())
                         child.pack_leader = self.__hash__()
 
-                    child.traits[0] = self.traits[0]
+                    #child.traits[0] = self.traits[0]
                     
                     carnivores.append(child)
                     self.hunger += 6
@@ -196,6 +200,7 @@ class Carnivore:
                         self.prey = creatures[self.prey_target]
                         self.prey_timer = time.time()
                         self.rest_timer = time.time()
+                    #print('d')
             else:
                 self.prey_target = None
                 self.prey = None
@@ -211,13 +216,13 @@ class Carnivore:
         if time.time() - self.move_delay >= 0.25:
             self.move_angle += secrets.choice(range(-5, 5))
 
-        if time.time() - self.delay >= 2:
+        if time.time() - self.delay >= 1.5:
             self.hunger += 1
             self.delay = time.time()
 
         if self.hunger > self.food_requirement:
             self.vital_status = 0
-            if self.pack != []:
+            if self.pack_leader == None:
                 count = []
                 sizes = []
 
@@ -226,28 +231,29 @@ class Carnivore:
                         sizes.append(carnivore.traits[1])
                         count.append(c)
 
-                new_leader = count[sizes.index(max(sizes))]
-                carnivores[new_leader].pack_leader = None
+                if len(sizes) > 0:
+                    new_leader = count[sizes.index(max(sizes))]
+                    carnivores[new_leader].pack_leader = None
 
-                self.pack.remove(carnivores[new_leader].__hash__())
-                count.remove(new_leader)
+                    self.pack.remove(carnivores[new_leader].__hash__())
+                    count.remove(new_leader)
 
-                carnivores[new_leader].pack = self.pack + []
+                    carnivores[new_leader].pack = self.pack + []
 
-                for i in count:
-                    carnivores[i].pack_leader = carnivores[new_leader].__hash__()
-            
+                    for i in count:
+                        carnivores[i].pack_leader = carnivores[new_leader].__hash__()
+                
         if self.hunger > self.food_requirement*2/3:
             self.search_prey(creatures)
             
-        if self.hunger < self.food_requirement/2 and (time.time() - self.new_timer >= 8):
+        if self.hunger < self.food_requirement/2 and (time.time() - self.new_timer >= self.breed_interval):
             self.new()
         else:
             self.target = None
 
         self.vel = [self.speed*math.cos(math.radians(self.move_angle)), self.speed*math.sin(math.radians(self.move_angle))]
 
-        if time.time() - self.rest_timer <= 8:
+        if time.time() - self.rest_timer <= self.rest_duration:
             self.vel = [0, 0]
             self.target = None
             self.target_creature = None
@@ -256,25 +262,42 @@ class Carnivore:
 
         if self.pack_leader != None:
             for carnivore in carnivores:
-                if carnivore.__hash__() == self.pack_leader:
-                    if math.dist((self.x, self.y), (carnivore.x, carnivore.y)) > 450:
+                if carnivore.__hash__() == self.pack_leader and self.hunger < (self.food_requirement*2/3):
+                    if math.dist((self.x, self.y), (carnivore.x, carnivore.y)) > 300:
                         self.move_angle = angle_between(((self.x, self.y), (carnivore.x, carnivore.y)))
                         self.vel = [self.speed*math.cos(math.radians(self.move_angle)), self.speed*math.sin(math.radians(self.move_angle))]
 
-                        if time.time() - self.rest_timer <= 8:
+                        if time.time() - self.rest_timer <= self.rest_duration:
                             self.to_rest = True
-                            
-                        if self.to_rest:
-                            self.rest_timer = time.time() - 8
+                            self.difference = time.time()
                         
                     else:
                         if self.to_rest:
-                            self.rest_timer = time.time() + 4
+                            self.rest_timer = self.rest_timer + (time.time() - self.difference)
                             self.to_rest = False
                     break
+            if self.hunger >= (self.food_requirement*2/3):
+                self.search_prey(creatures)
+
+            if math.dist((self.x, self.y), (carnivore.x, carnivore.y)) > 600:
+                for carnivore in carnivores:
+                    if carnivore.__hash__() == self.pack_leader and self.hunger < (self.food_requirement*2/3):
+                        if math.dist((self.x, self.y), (carnivore.x, carnivore.y)) > 300:
+                            self.move_angle = angle_between(((self.x, self.y), (carnivore.x, carnivore.y)))
+                            self.vel = [self.speed*math.cos(math.radians(self.move_angle)), self.speed*math.sin(math.radians(self.move_angle))]
+
+                            if time.time() - self.rest_timer <= self.rest_duration:
+                                self.to_rest = True
+                                self.difference = time.time()
+                            
+                        else:
+                            if self.to_rest:
+                                self.rest_timer = self.rest_timer + (time.time() - self.difference)
+                                self.to_rest = False
+                        break
             
-        if self.pack != []:
-            if len(self.pack) > 10:
+        else:
+            if len(self.pack) > 20:
 
                 count = []
                 sizes = []
@@ -327,7 +350,7 @@ class Carnivore:
             self.x -= self.vel[0]*2
             self.y -= self.vel[1]*2
 
-carnivores = [Carnivore(secrets.choice(range(win.get_width() - 300, win.get_width() + 300)), secrets.choice(range(win.get_height() - 300, win.get_height() + 300)), secrets.randbelow(3), [[125, 0, 0], 10, 17.5, 5], 0) for i in range(10)]
+carnivores = [Carnivore(secrets.choice(range(win.get_width() - 300, win.get_width() + 300)), secrets.choice(range(win.get_height() - 300, win.get_height() + 300)), secrets.randbelow(3), [[125, 0, 0], 10, 17.5, 5.25], 0) for i in range(10)]
 carnivores[0].pack = [carnivore.__hash__() for carnivore in carnivores[1:]]
 for carnivore in carnivores[1:]:
     carnivore.pack_leader = carnivores[0].__hash__()
