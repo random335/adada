@@ -1,6 +1,7 @@
 from carnivore import *
 sin_table = [math.sin(math.radians(i)) for i in range(360)]
 cos_table = [math.cos(math.radians(i)) for i in range(360)]
+
 class Herbivore:
     def __init__(self, x, y, _type_, traits, generation):
         self.x = x
@@ -19,7 +20,6 @@ class Herbivore:
         self.move_angle = secrets.choice(range(-180, 180))
         self.move_delay = time.time()
 
-        self.rect = pygame.rect.Rect(x - self.traits[1], y - self.traits[1], self.traits[1]*2, self.traits[1]*2)
 
         self.target = None
         self.plant_target = None
@@ -30,8 +30,13 @@ class Herbivore:
         
         self.gen = generation
         
+        self.image = scale_image(herbivore_image, self.traits[1]/10)
+        self.mask = pygame.mask.from_surface(self.image)
+        self.rect = self.image.get_rect(topleft=(self.x, self.y))
+        
         self.calculation_timer = time.time()
         self.run_angle = 0
+        self.destination = [0, 0]
         
     def new(self):
         if self.target == None:
@@ -57,8 +62,7 @@ class Herbivore:
                     self.target_creature = None
                     return
                 self.move_angle = angle_between([(self.x, self.y), (creatures[self.target].x, creatures[self.target].y)])
-
-                #pygame.draw.line(win, [255, 255, 255], (self.x + cam_offset[0], self.y + cam_offset[1]), (creatures[self.target].x + cam_offset[0], creatures[self.target].y + cam_offset[1]), 8)
+                self.destination = [creatures[self.target].x, creatures[self.target].y]
 
                 if self.rect.colliderect(creatures[self.target].rect):
                     new_color = secrets.choice([creatures[self.target].traits[0], self.traits[0]])
@@ -116,14 +120,19 @@ class Herbivore:
             dists = [math.dist((self.x, self.y), plant) for plant in plant_manager.plants]
        
             if len(dists) > 0:
-                self.plant_target = dists.index(min(dists))
-                self.plant = plant_manager.plants[self.plant_target]
+                for i in range(25):
+                    self.plant_target = dists.index(min(dists))
+                    self.plant = plant_manager.plants[self.plant_target]
+                    for carnivore in carnivores:
+                        if math.dist((self.x, self.y), (carnivore.x, carnivore.y)) <= (min(dists)+200):
+                            if math.dist(self.plant, (carnivore.x, carnivore.y)) <= 200:
+                                dists[self.plant_target] = 10000
             
         else:
             if self.plant in plant_manager.plants:
-                #pygame.draw.line(win, [255, 255, 255], (self.x + cam_offset[0], self.y + cam_offset[1]), (self.plant[0] + cam_offset[0], self.plant[1] + cam_offset[1]))
                 self.move_angle = angle_between([(self.x, self.y), self.plant])
-                if self.rect.collidepoint(self.plant):
+                self.destination = self.plant
+                if self.mask.overlap(plant_manager.mask, [self.plant[0] - self.x, self.plant[1] - self.y]):
                     plant_manager.plants.remove(self.plant)
                     self.hunger -= 4
             
@@ -136,12 +145,6 @@ class Herbivore:
                 self.plant = None
 
     def update(self):
-        
-        pygame.draw.circle(win, self.traits[0], (self.x + cam_offset[0], self.y + cam_offset[1]), self.traits[1])
-        self.rect.x = self.x - self.traits[1]
-        self.rect.y = self.y - self.traits[1]
-
-        #pygame.draw.rect(win, [255, 255, 255], self.rect)
 
         if time.time() - self.move_delay >= 0.25:
             self.move_angle += secrets.choice(range(-5, 5))
@@ -165,9 +168,9 @@ class Herbivore:
         if min(dists) <= 200:
             
             best_average_dist = 0
-            if (time.time() - self.calculation_timer) >= 0.25:
-                for i in range(360):
-                    check_point = [self.x + self.speed*cos_table[i]*15, self.y + self.speed*sin_table[i]*15]
+            if (time.time() - self.calculation_timer) >= 0.5:
+                for i in range(0, 360, 4):
+                    check_point = [self.x + self.speed*cos_table[i]*30, self.y + self.speed*sin_table[i]*30]
                     avg_dist = 0
                     if check_point[0] <= - 1300 or check_point[0] >= win.get_width() + 1300:
                         avg_dist = -1000000
@@ -185,6 +188,7 @@ class Herbivore:
                     if avg_dist > best_average_dist:
                         best_average_dist = avg_dist
                         self.move_angle = i
+                        self.destination = check_point
                         self.run_angle = i
                 self.calculation_timer = time.time()
             else:
@@ -193,7 +197,10 @@ class Herbivore:
             for plant in plant_manager.plants:
                 if math.dist((self.x, self.y), plant) <= 35 and (self.hunger > (self.food_requirement*2/3)):
                     self.move_angle = angle_between([(self.x, self.y), plant])
-                    if self.rect.collidepoint(plant):
+                    self.destination = plant
+                    self.plant = plant
+                        
+                    if herbivore_masks[round(self.move_angle)].overlap(plant_manager.mask, [self.plant[0] - self.x, self.plant[1] - self.y]):
                         
                         plant_manager.plants.remove(plant)
                         
@@ -204,6 +211,12 @@ class Herbivore:
                         self.plant_target = None
                         self.plant = None
                         break
+        new_image = pygame.transform.rotate(self.image, angle_between((((self.x + cam_offset[0], self.y + cam_offset[1]), [self.destination[0] + cam_offset[0], self.destination[1] + cam_offset[1]]))) + 90)
+        win.blit(new_image, (self.x + cam_offset[0], self.y + cam_offset[1]))
+        self.mask = pygame.mask.from_surface(new_image)
+        self.rect = new_image.get_rect(topleft=(self.x, self.y))
+        
+        #pygame.draw.line(win, [255, 255, 255], (self.x + cam_offset[0], self.y + cam_offset[1]), [self.destination[0] + cam_offset[0], self.destination[1] + cam_offset[1]], 8)
             
         self.vel = [self.speed*math.cos(math.radians(self.move_angle)), self.speed*math.sin(math.radians(self.move_angle))]
 
@@ -235,7 +248,7 @@ font = pygame.font.SysFont("Arial", 32)
 clock = pygame.Clock()
 
 while True:
-    win.fill((0, 0, 0))
+    win.fill((0, 0, 255))
     clock.tick(60)
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
