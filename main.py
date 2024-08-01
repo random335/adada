@@ -19,7 +19,7 @@ class Herbivore:
         self.speed = traits[3]
         self.move_angle = secrets.choice(range(-180, 180))
         self.move_delay = time.time()
-
+        self.shown_angle = self.move_angle
 
         self.target = None
         self.plant_target = None
@@ -200,7 +200,7 @@ class Herbivore:
                     self.destination = plant
                     self.plant = plant
                         
-                    if herbivore_masks[round(self.move_angle)].overlap(plant_manager.mask, [self.plant[0] - self.x, self.plant[1] - self.y]):
+                    if self.mask.overlap(plant_manager.mask, [self.plant[0] - self.x, self.plant[1] - self.y]):
                         
                         plant_manager.plants.remove(plant)
                         
@@ -211,12 +211,19 @@ class Herbivore:
                         self.plant_target = None
                         self.plant = None
                         break
-        new_image = pygame.transform.rotate(self.image, angle_between((((self.x + cam_offset[0], self.y + cam_offset[1]), [self.destination[0] + cam_offset[0], self.destination[1] + cam_offset[1]]))) + 90)
+                    
+        if self.shown_angle < self.move_angle:
+            self.shown_angle += 3.5
+        if self.shown_angle > self.move_angle:
+            self.shown_angle -= 3.5
+            
+        new_image = pygame.transform.rotate(self.image, self.shown_angle + 90)
         win.blit(new_image, (self.x + cam_offset[0], self.y + cam_offset[1]))
         self.mask = pygame.mask.from_surface(new_image)
         self.rect = new_image.get_rect(topleft=(self.x, self.y))
         
         #pygame.draw.line(win, [255, 255, 255], (self.x + cam_offset[0], self.y + cam_offset[1]), [self.destination[0] + cam_offset[0], self.destination[1] + cam_offset[1]], 8)
+        
             
         self.vel = [self.speed*math.cos(math.radians(self.move_angle)), self.speed*math.sin(math.radians(self.move_angle))]
 
