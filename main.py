@@ -2,6 +2,44 @@ from carnivore import *
 sin_table = [math.sin(math.radians(i)) for i in range(360)]
 cos_table = [math.cos(math.radians(i)) for i in range(360)]
 
+pygame.mixer.init()
+songs = [pygame.mixer.Sound("song_" + str(i) + ".ogg") for i in range(1, 4)]
+song_channel = pygame.mixer.Channel(0)
+current_song = secrets.randbelow(3)
+song_channel.play(songs[current_song])
+
+class Button:
+    def __init__(self, position, textures, function):
+        self.textures = textures
+        self.onlick = function[0]
+        self.args = function[1]
+        self.pos = position
+        self.current = 0
+        self.rect = self.textures[self.current].get_rect(topleft=self.pos)
+        self.click_delay = 0
+        self.max_delay = 500
+        self.delaying = False
+        self.clicksound = pygame.mixer.Sound("click.ogg")
+    def update(self):
+        self.current = 0
+        if self.delaying:
+            self.click_delay += 1
+        if self.click_delay >= self.max_delay:
+            self.delaying = False
+        if self.rect.collidepoint(pygame.mouse.get_pos()):
+            if pygame.mouse.get_pressed()[0]:
+                if not self.delaying:
+                    self.onlick(self.args)
+                    self.clicksound.play()
+            self.current = 1
+        win.blit(self.textures[self.current], self.pos)
+        self.rect = self.textures[self.current].get_rect(topleft=self.pos)
+
+buttons = scale_image(pygame.image.load("buttons.png").convert())
+button_sheet = SpriteSheet(buttons, [2, 1], [255, 255, 255]).sheet[0]
+
+start_button = Button((250, 250), button_sheet, [lambda x : print("a"), 1])
+
 class Herbivore:
     def __init__(self, x, y, _type_, traits, generation):
         self.x = x
@@ -37,6 +75,8 @@ class Herbivore:
         self.calculation_timer = time.time()
         self.run_angle = 0
         self.destination = [0, 0]
+        
+        self.final_image = None
         
     def new(self):
         if self.target == None:
@@ -156,6 +196,22 @@ class Herbivore:
         if self.hunger > self.food_requirement:
             self.vital_status = 0
             
+        
+        if self.vital_status == 0:
+            particle_sheet = SpriteSheet(self.final_image, [self.final_image.get_width()//4, self.final_image.get_height()//4], [255, 255, 255])
+
+            colors = []
+            positions = []
+            for j, sheet in enumerate(particle_sheet.sheet):
+                    for i, surf in enumerate(sheet):
+                        colors.append(surf.get_at([0, 0]))
+                        if not (colors[-1].r == 0 and colors[-1].g == 0 and colors[-1].b == 0):
+                            positions.append([self.x + (i*4), self.y + (j*4)])
+                        else:
+                            colors.pop()
+                        
+            death_anims.append(DeathParticleManger((4, 4), positions, colors))
+            
         self.search_plants()
             
         if self.hunger < self.food_requirement/2:
@@ -218,6 +274,7 @@ class Herbivore:
             self.shown_angle -= 3.5
             
         new_image = pygame.transform.rotate(self.image, self.shown_angle + 90)
+        self.final_image = new_image
         win.blit(new_image, (self.x + cam_offset[0], self.y + cam_offset[1]))
         self.mask = pygame.mask.from_surface(new_image)
         self.rect = new_image.get_rect(topleft=(self.x, self.y))
@@ -257,9 +314,16 @@ clock = pygame.Clock()
 while True:
     win.fill((0, 0, 255))
     clock.tick(60)
+    
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             pygame.quit()
+
+    start_button.update()
+
+    if not song_channel.get_busy():
+        current_song = secrets.randbelow(3)
+        song_channel.play(songs[current_song])
 
     plant_manager.update()
 
@@ -293,17 +357,22 @@ while True:
         overall_time = time.time()
     """
     [creature.update() for creature in creatures]
-    [carnivore.update(creatures) for carnivore in carnivores]
-
+    
     for count, creature in enumerate(creatures):
         if creature.vital_status == 0:
             creatures.pop(count)
             deaths += 1
             
+    [carnivore.update(creatures) for carnivore in carnivores]
+    
     for count, carnivore in enumerate(carnivores):
         if carnivore.vital_status == 0:
             carnivores.pop(count)
-            #deaths += 1        
+    
+    for anim in death_anims:
+        anim.update()
+        if anim.alpha <= 5:
+            death_anims.remove(anim)
     
     pygame.draw.rect(win, [125, 125, 125], pygame.Rect(0, 0, 450, 225))
     pop_text = font.render("Population: H - " + str(len(creatures)) + ", C - " + str(len(carnivores)), False, [0, 0, 0], [125, 125, 125])
