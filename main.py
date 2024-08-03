@@ -35,10 +35,18 @@ class Button:
         win.blit(self.textures[self.current], self.pos)
         self.rect = self.textures[self.current].get_rect(topleft=self.pos)
 
-buttons = scale_image(pygame.image.load("buttons.png").convert())
-button_sheet = SpriteSheet(buttons, [2, 1], [255, 255, 255]).sheet[0]
+start_button_sheet = scale_image(pygame.image.load("start_buttons.png").convert(), 1.5)
+exit_button_sheet = scale_image(pygame.image.load("exit_buttons.png").convert(), 1.5)
 
-start_button = Button((250, 250), button_sheet, [lambda x : print("a"), 1])
+start_button_spritesheet = SpriteSheet(start_button_sheet, [2, 1], [255, 255, 255]).sheet[0]
+exit_button_spritesheet = SpriteSheet(exit_button_sheet, [2, 1], [255, 255, 255]).sheet[0]
+
+def set_state(x):
+    global game_state
+    game_state = 1
+
+start_button = Button(((win.get_width()/2) - (start_button_sheet.get_width()/4), (win.get_height()/2) - (start_button_sheet.get_height()/4)), start_button_spritesheet, [set_state, 1])
+exit_button = Button(((win.get_width()/2) - (exit_button_sheet.get_width()/4), (win.get_height()/2) - (exit_button_sheet.get_height()/4) + 96), exit_button_spritesheet, [lambda x: exit(), 1])
 
 class Herbivore:
     def __init__(self, x, y, _type_, traits, generation):
@@ -310,6 +318,10 @@ creatures = [Herbivore(secrets.choice(range(-1250, win.get_width() + 1250)), sec
 
 font = pygame.font.SysFont("Arial", 32)
 clock = pygame.Clock()
+global game_state
+game_state = 0
+
+bg = pygame.image.load("bg.png").convert()
 
 while True:
     win.fill((0, 0, 255))
@@ -319,90 +331,126 @@ while True:
         if event.type == pygame.QUIT:
             pygame.quit()
 
-    start_button.update()
-
     if not song_channel.get_busy():
         current_song = secrets.randbelow(3)
         song_channel.play(songs[current_song])
 
-    plant_manager.update()
-
-    if pygame.key.get_pressed()[pygame.K_RIGHT]:
-        cam_offset[0] -= 8
-    if pygame.key.get_pressed()[pygame.K_LEFT]:
-        cam_offset[0] += 8
-
-    if pygame.key.get_pressed()[pygame.K_UP]:
-        cam_offset[1] += 8
-    if pygame.key.get_pressed()[pygame.K_DOWN]:
-        cam_offset[1] -= 8
-
-    """if time.time() - overall_time >= 15:
-        print("a")
-        orig_ages = [(time.time() - creature.life_timer) for creature in creatures]
-        sorted_ages = reversed(sorted(orig_ages))
-        new_creatures = []
-        for age in sorted_ages:
-            new_creatures.append(orig_ages.index(age))
-            orig_ages.remove(age)
+    if game_state == 0:
+        win.blit(bg, (0, 0))
+        start_button.update()
+        exit_button.update()
+    else:
         
-        l = round(len(new_creatures)/4)
-        for i in range(l):
-            try:
-                creatures.pop(new_creatures[i])
+        if pygame.key.get_pressed()[pygame.K_ESCAPE]:
+            game_state = 0
+            
+            plant_manager = PlantManager()
+            creatures.clear()
+            creatures = [Herbivore(secrets.choice(range(-1250, win.get_width() + 1250)), secrets.choice(range(-1250, win.get_height() + 1250)), secrets.randbelow(3), [[0, 0, 125], 10, 15, 5], 0) for i in range(100)]
+            
+            start_traits = [[125, 0, 0], 10, 18, 6]
+            
+            carnivores.clear()
+            
+            carnivores = [Carnivore(secrets.choice(range(win.get_width() - 300, win.get_width() + 300)), secrets.choice(range(win.get_height() - 300, win.get_height() + 300)), secrets.randbelow(3), start_traits, 0) for i in range(10)]
+            carnivores[0].pack = [carnivore.__hash__() for carnivore in carnivores[1:]]
+            for carnivore in carnivores[1:]:
+                carnivore.pack_leader = carnivores[0].__hash__()
+                
+            start_traits[0] = [0, 255, 0]
+                
+            carnivores_2.clear()
+            carnivores_2 = [Carnivore(secrets.choice(range(win.get_width() - 800, win.get_width() + 800)), secrets.choice(range(win.get_height() - 800, win.get_height() + 800)), secrets.randbelow(3), start_traits, 0) for i in range(10)]
+            carnivores_2[0].pack = [carnivore.__hash__() for carnivore in carnivores_2[1:]]
+            for carnivore in carnivores_2[1:]:
+                carnivore.pack_leader = carnivores_2[0].__hash__()
+
+            carnivores = carnivores + carnivores_2
+            
+            death_anims.clear()
+            
+            deaths = 0
+            
+            continue
+        
+        plant_manager.update()
+
+        if pygame.key.get_pressed()[pygame.K_RIGHT]:
+            cam_offset[0] -= 8
+        if pygame.key.get_pressed()[pygame.K_LEFT]:
+            cam_offset[0] += 8
+
+        if pygame.key.get_pressed()[pygame.K_UP]:
+            cam_offset[1] += 8
+        if pygame.key.get_pressed()[pygame.K_DOWN]:
+            cam_offset[1] -= 8
+
+        """if time.time() - overall_time >= 15:
+            print("a")
+            orig_ages = [(time.time() - creature.life_timer) for creature in creatures]
+            sorted_ages = reversed(sorted(orig_ages))
+            new_creatures = []
+            for age in sorted_ages:
+                new_creatures.append(orig_ages.index(age))
+                orig_ages.remove(age)
+            
+            l = round(len(new_creatures)/4)
+            for i in range(l):
+                try:
+                    creatures.pop(new_creatures[i])
+                    deaths += 1
+                except:
+                    pass
+                
+            overall_time = time.time()
+        """
+        [creature.update() for creature in creatures]
+        
+        for count, creature in enumerate(creatures):
+            if creature.vital_status == 0:
+                creatures.pop(count)
                 deaths += 1
-            except:
-                pass
-            
-        overall_time = time.time()
-    """
-    [creature.update() for creature in creatures]
-    
-    for count, creature in enumerate(creatures):
-        if creature.vital_status == 0:
-            creatures.pop(count)
-            deaths += 1
-            
-    [carnivore.update(creatures) for carnivore in carnivores]
-    
-    for count, carnivore in enumerate(carnivores):
-        if carnivore.vital_status == 0:
-            carnivores.pop(count)
-    
-    for anim in death_anims:
-        anim.update()
-        if anim.alpha <= 5:
-            death_anims.remove(anim)
-    
-    pygame.draw.rect(win, [125, 125, 125], pygame.Rect(0, 0, 450, 225))
-    pop_text = font.render("Population: H - " + str(len(creatures)) + ", C - " + str(len(carnivores)), False, [0, 0, 0], [125, 125, 125])
+                
+        [carnivore.update(creatures) for carnivore in carnivores]
+        
+        for count, carnivore in enumerate(carnivores):
+            if carnivore.vital_status == 0:
+                carnivores.pop(count)
+        
+        for anim in death_anims:
+            anim.update()
+            if anim.alpha <= 10:
+                death_anims.remove(anim)
+        
+        #pygame.draw.rect(win, [125, 125, 125], pygame.Rect(0, 0, 450, 225))
+        pop_text = font.render("Population: H - " + str(len(creatures)) + ", C - " + str(len(carnivores)), False, [0, 0, 0], [125, 125, 125])
 
-    avg_speed = sum([(creature.traits[-1]) for creature in creatures])/len(creatures)
-    avg_c_speed = sum([(carnivore.traits[-1]) for carnivore in carnivores])/len(carnivores)
-    speed_text = font.render("Speed: H - " + str(round(avg_speed, 3)) + ", C - " + str(round(avg_c_speed, 3)), False, [0, 0, 0], [125, 125, 125])
+        avg_speed = sum([(creature.traits[-1]) for creature in creatures])/len(creatures)
+        avg_c_speed = sum([(carnivore.traits[-1]) for carnivore in carnivores])/len(carnivores)
+        speed_text = font.render("Speed: H - " + str(round(avg_speed, 3)) + ", C - " + str(round(avg_c_speed, 3)), False, [0, 0, 0], [125, 125, 125])
+        
+        avg_size = sum([(creature.traits[1]) for creature in creatures])/len(creatures)
+        avg_c_size = sum([(carnivore.traits[1]) for carnivore in carnivores])/len(carnivores)
+        size_text = font.render("Radius: H - " + str(round(avg_size, 3)) + ", C - " + str(round(avg_c_size, 3)), False, [0, 0, 0], [125, 125, 125])
+        
+        food_req = sum([(creature.traits[-2]) for creature in creatures])/len(creatures)
+        food_text = font.render("Food Req: " + str(round(food_req, 3)), False, [0, 0, 0], [125, 125, 125])
+        
+        gen_text = font.render("Gens alive: " + str(min([creature.gen for creature in creatures])) + ", " + str(max([creature.gen for creature in creatures])), False, [0, 0, 0], [125, 125, 125])
     
-    avg_size = sum([(creature.traits[1]) for creature in creatures])/len(creatures)
-    avg_c_size = sum([(carnivore.traits[1]) for carnivore in carnivores])/len(carnivores)
-    size_text = font.render("Radius: H - " + str(round(avg_size, 3)) + ", C - " + str(round(avg_c_size, 3)), False, [0, 0, 0], [125, 125, 125])
-    
-    food_req = sum([(creature.traits[-2]) for creature in creatures])/len(creatures)
-    food_text = font.render("Food Req: " + str(round(food_req, 3)), False, [0, 0, 0], [125, 125, 125])
-    
-    gen_text = font.render("Gens alive: " + str(min([creature.gen for creature in creatures])) + ", " + str(max([creature.gen for creature in creatures])), False, [0, 0, 0], [125, 125, 125])
-   
-    d_text = font.render("Deaths: " + str(deaths), False, [0, 0, 0], [125, 125, 125])
+        d_text = font.render("Deaths: " + str(deaths), False, [0, 0, 0], [125, 125, 125])
 
-    win.blit(pop_text, (10, 10))
-    win.blit(size_text, (10, 50))
-    win.blit(speed_text, (10, 90))
-    win.blit(food_text, (10, 130))
-    win.blit(gen_text, (10, 170))
-    win.blit(d_text, (10, 210))
+        """win.blit(pop_text, (10, 10))
+        win.blit(size_text, (10, 50))
+        win.blit(speed_text, (10, 90))
+        win.blit(food_text, (10, 130))
+        win.blit(gen_text, (10, 170))
+        win.blit(d_text, (10, 210))"""
 
-    """n_packs = 0
-    for carnivore in carnivores:
-        if carnivore.pack_leader == None:
-            n_packs += 1
-    print(n_packs, ", ", len(carnivores))"""
-    
+        """n_packs = 0
+        for carnivore in carnivores:
+            if carnivore.pack_leader == None:
+                n_packs += 1
+        print(n_packs, ", ", len(carnivores))"""
+        
     pygame.display.update()
