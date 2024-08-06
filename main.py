@@ -159,6 +159,9 @@ class Carnivore:
         self.rest_duration = 2.5
         self.breed_interval = 3.5
         
+        self.selected_image = scale_image(carnivore_image, self.traits[1]/10)
+        self.normal_image = scale_image(carnivore_image, self.traits[1]/10)
+        swap_color(self.selected_image, [0, 0, 0], [254, 254, 254])
         self.image = scale_image(carnivore_image, self.traits[1]/10)
         swap_color(self.image, [127, 15, 15], self.traits[0])
         self.final_image = self.image
@@ -586,7 +589,10 @@ class Herbivore:
         
         self.gen = generation
         
-        self.image = scale_image(herbivore_image, self.traits[1]/10)
+        self.selected_image = scale_image(herbivore_image, self.traits[1]/10)
+        self.normal_image = scale_image(herbivore_image, self.traits[1]/10)
+        swap_color(self.selected_image, [0, 0, 0], [254, 254, 254])
+        self.image = self.normal_image
         self.mask = pygame.mask.from_surface(self.image)
         self.rect = self.image.get_rect(topleft=(self.x, self.y))
         
@@ -832,21 +838,33 @@ global game_state
 game_state = 0
 
 bg = pygame.image.load("bg.png").convert()
+
 stats_font = pygame.font.Font("yoster.ttf", 24)
 stats_table = scale_image(pygame.image.load("stats.png").convert(), 2)
+
 title = scale_image(pygame.image.load("title.png").convert(), 2)
 title.set_colorkey([255, 255, 255])
 swap_color(title, [0, 0, 0], [254, 254, 254])
+
 carnivore_deaths = 0
+
 paused = False
 paused_text = scale_image(font.render("PAUSED", False, [255, 255, 255], [0, 0, 0]), 2)
 paused_text.set_colorkey((0, 0, 0))
 pressed = False
+pressed2 = False
+
+selected_creature = [5, 1000]
+
+cursor_image = scale_image(pygame.image.load("cursor.png").convert(), 2)
+cursor_image.set_colorkey([0, 0, 0])
+cursor_mask = pygame.mask.from_surface(cursor_image)
+pygame.mouse.set_visible(False)
 
 while True:
     win.fill((0, 0, 255))
     clock.tick(60)
-    
+        
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             pygame.quit()
@@ -904,6 +922,36 @@ while True:
         if pygame.key.get_pressed()[pygame.K_DOWN]:
             cam_offset[1] -= 8
 
+        mouse_pos = pygame.mouse.get_pos()
+            
+        
+            
+        for creature in creatures:
+            
+            if pygame.mouse.get_pressed()[0]:
+                overlap = creature.mask.overlap(cursor_mask, (mouse_pos[0] - creature.x, mouse_pos[1] - creature.y))
+
+                if overlap:    
+                    selected_creature = [0, creature.__hash__()]
+                
+            if creature.__hash__() == selected_creature[1]:
+                creature.image = creature.selected_image
+            else:
+                creature.image = creature.normal_image
+                
+        for carnivore in carnivores:
+            
+            if pygame.mouse.get_pressed()[0]:
+                overlap = carnivore.mask.overlap(cursor_mask, (mouse_pos[0] - carnivore.x, mouse_pos[1] - carnivore.y))
+            
+                if overlap:
+                    selected_creature = [1, carnivore.__hash__()]
+                
+            if carnivore.__hash__() == selected_creature[1]:
+                carnivore.image = carnivore.selected_image
+            else:
+                carnivore.image = carnivore.normal_image
+
         if not paused:
             [creature.update() for creature in creatures]
             
@@ -938,6 +986,8 @@ while True:
                     death_anims.remove(anim)
                     
             win.blit(paused_text, ((win.get_width() - paused_text.get_width())/2, win.get_height() - (paused_text.get_height() + 12)))
+
+        
         stats_button.update()
         
         if pygame.key.get_pressed()[pygame.K_SPACE]:
@@ -977,5 +1027,7 @@ while True:
             c_deaths_text = stats_font.render(str(carnivore_deaths), False, [127, 127, 127], [0, 0, 0])
             win.blit(h_deaths_text, [252, 335])
             win.blit(c_deaths_text, [464, 335])
+            
+    win.blit(cursor_image, pygame.mouse.get_pos())
         
     pygame.display.update()
