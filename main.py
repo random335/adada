@@ -97,7 +97,7 @@ class DeathParticleManger:
             win.blit(texture, [self.positions[count][0] + cam_offset[0], self.positions[count][1] + cam_offset[1]])
             
             self.positions[count][0] -= flutter
-            self.positions[count][1] -= 1.5
+            self.positions[count][1]
             
 plant_manager = PlantManager()
 
@@ -826,7 +826,7 @@ pygame.init()
 #traits[3] is speed
 creatures = [Herbivore(secrets.choice(range(-1250, win.get_width() + 1250)), secrets.choice(range(-1250, win.get_height() + 1250)), secrets.randbelow(3), [[0, 0, 125], 10, 15, 5], 0) for i in range(100)]
 
-font = pygame.font.SysFont("Arial", 32)
+font = pygame.font.Font("yoster.ttf", 32)
 clock = pygame.Clock()
 global game_state
 game_state = 0
@@ -838,6 +838,11 @@ title = scale_image(pygame.image.load("title.png").convert(), 2)
 title.set_colorkey([255, 255, 255])
 swap_color(title, [0, 0, 0], [254, 254, 254])
 carnivore_deaths = 0
+paused = False
+paused_text = scale_image(font.render("PAUSED", False, [255, 255, 255], [0, 0, 0]), 2)
+paused_text.set_colorkey((0, 0, 0))
+pressed = False
+
 while True:
     win.fill((0, 0, 255))
     clock.tick(60)
@@ -899,26 +904,50 @@ while True:
         if pygame.key.get_pressed()[pygame.K_DOWN]:
             cam_offset[1] -= 8
 
-        [creature.update() for creature in creatures]
-        
-        for count, creature in enumerate(creatures):
-            if creature.vital_status == 0:
-                creatures.pop(count)
-                deaths += 1
+        if not paused:
+            [creature.update() for creature in creatures]
+            
+            for count, creature in enumerate(creatures):
+                if creature.vital_status == 0:
+                    creatures.pop(count)
+                    deaths += 1
+                    
+            [carnivore.update(creatures) for carnivore in carnivores]
+            
+            for count, carnivore in enumerate(carnivores):
+                if carnivore.vital_status == 0:
+                    carnivores.pop(count)
+                    carnivore_deaths += 1
+            
+            for anim in death_anims:
+                anim.update()
+                if anim.alpha <= 10:
+                    death_anims.remove(anim)
+        else:
+            
+            for creature in creatures:
+                win.blit(creature.final_image, (creature.x + cam_offset[0], creature.y + cam_offset[1]))
                 
-        [carnivore.update(creatures) for carnivore in carnivores]
-        
-        for count, carnivore in enumerate(carnivores):
-            if carnivore.vital_status == 0:
-                carnivores.pop(count)
-                carnivore_deaths += 1
-        
-        for anim in death_anims:
-            anim.update()
-            if anim.alpha <= 10:
-                death_anims.remove(anim)
-        
+            for carnivore in carnivores:
+                win.blit(carnivore.final_image, (carnivore.x + cam_offset[0], carnivore.y + cam_offset[1]))
+                
+            for anim in death_anims:
+                anim.update()
+                anim.alpha += 6.5
+                if anim.alpha <= 10:
+                    death_anims.remove(anim)
+                    
+            win.blit(paused_text, ((win.get_width() - paused_text.get_width())/2, win.get_height() - (paused_text.get_height() + 12)))
         stats_button.update()
+        
+        if pygame.key.get_pressed()[pygame.K_SPACE]:
+            
+            if not pressed:
+                paused = not paused
+                pressed = True
+            
+        else:
+            pressed = False
         
         if show_stats:
             
